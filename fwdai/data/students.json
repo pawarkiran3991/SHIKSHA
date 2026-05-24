@@ -1,0 +1,26 @@
+{
+  "students": {
+    "S1": {
+      "student_id": "S1",
+      "child_name": "MITANSH",
+      "age": "6",
+      "grade": "SR_KG",
+      "parent_name": "KIRAN PAWAR",
+      "notes": "",
+      "latest_homework": "# Homework — Fun Learning Adventures!\n\n**Subject:** Explore & Discover!\n**For:** Mitansh\n\n## Instructions\nHi Mitansh! It's SHIKSHA here. I have some super fun activities for you this week. Let's explore and learn together! Remember to try your best and have fun!\n\n## Tasks\n1.  **Letter Hunt!** Can you find and circle all the big letter 'A's (like 'A') and little letter 'a's (like 'a') in a newspaper, magazine, or a book with your parent? Count how many you find!\n2.  **Counting Stars!** On a piece of paper, draw 5 shiny stars. Then, draw 3 happy circles. How many shapes did you draw altogether?\n3.  **My Favorite Animal!** Draw a picture of your favorite animal! What color is it? Can you tell your parent why it's your favorite?\n4.  **Shape Spy!** Look around your home! Can you find something that is a circle (like a plate)? How about a square (like a cushion)? What other shapes can you find?\n\n## Bonus (optional)\nSing your favorite nursery rhyme and do the actions! Have fun moving and singing!\n\n## Notes for parents\nPlease guide Mitansh with reading instructions and encourage their efforts in completing the tasks.",
+      "created_at": "2026-05-22T22:10:26.527800+00:00",
+      "updated_at": "2026-05-24T08:19:51.986085+00:00"
+    },
+    "S2": {
+      "student_id": "S2",
+      "child_name": "HARINI",
+      "age": "4",
+      "grade": "Jr_KG",
+      "parent_name": "MADHURI PAWAR",
+      "notes": "",
+      "latest_homework": "",
+      "created_at": "2026-05-24T08:22:23.757133+00:00",
+      "updated_at": "2026-05-24T08:22:23.757133+00:00"
+    }
+  }
+}
