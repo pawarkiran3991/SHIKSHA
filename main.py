@@ -13,7 +13,7 @@ from google.genai import types
 
 # warnings.filterwarnings("ignore", category=UserWarning, module="sounddevice")
 
-def load_env_file(env_path: str = ".env") -> None:
+def load_env_file(env_path: str = ".env", override: bool = True) -> None:
     """Load simple KEY=VALUE pairs from a local .env file if present."""
     path = Path(env_path)
     if not path.exists():
@@ -31,7 +31,7 @@ def load_env_file(env_path: str = ".env") -> None:
         key, value = line.split("=", 1)
         key = key.strip()
         value = value.strip()
-        if not key or key in os.environ:
+        if not key or (key in os.environ and not override):
             continue
 
         if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
@@ -446,14 +446,6 @@ class LiveVoiceAssistant:
 
     def clear_messages(self) -> None:
         self.state.clear_messages()
-
-    def restore_messages(self, messages: list[dict[str, str]]) -> None:
-        self.state.clear_messages()
-        for message in messages:
-            role = message.get("role", "")
-            text = (message.get("text") or "").strip()
-            if role in ("user", "assistant", "system") and text:
-                self.state.add_message(role, text)
 
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()

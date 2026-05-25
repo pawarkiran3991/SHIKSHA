@@ -15,13 +15,28 @@ load_env_file()
 
 DEFAULT_TEXT_MODEL = "gemini-2.0-flash"
 
+# Singleton client — reused across calls to avoid "client has been closed" errors
+_GENAI_CLIENT: genai.Client | None = None
+
 
 def get_text_model() -> str:
-    return os.getenv("GEMINI_TEXT_MODEL", DEFAULT_TEXT_MODEL).strip() or DEFAULT_TEXT_MODEL
+    text_model = os.getenv("GEMINI_TEXT_MODEL", "").strip()
+    if text_model:
+        return text_model
+
+    configured_model = os.getenv("GEMINI_MODEL", "").strip()
+    if configured_model and "live" not in configured_model.lower():
+        return configured_model
+
+    return DEFAULT_TEXT_MODEL
 
 
 def _client() -> genai.Client:
-    return genai.Client(api_key=get_api_key())
+    """Return the module-level genai.Client singleton, creating it on first call."""
+    global _GENAI_CLIENT
+    if _GENAI_CLIENT is None:
+        _GENAI_CLIENT = genai.Client(api_key=get_api_key())
+    return _GENAI_CLIENT
 
 
 def generate_homework_sheet(details: str, grade_hint: str = "") -> str:
@@ -141,6 +156,41 @@ def extract_upload_text(uploaded_file: Any) -> tuple[str, list[types.Part]]:
     return "[Unsupported file type. Use .txt, .pdf, .docx, or an image.]", image_parts
 
 
+def extract_upload_text_bytes(
+    raw: bytes, filename: str, content_type: str = ""
+) -> tuple[str, list[types.Part]]:
+    """Same as extract_upload_text but accepts raw bytes + filename — for FastAPI."""
+    name = (filename or "").lower()
+    image_parts: list[types.Part] = []
+
+    if name.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif")):
+        mime = content_type or "image/jpeg"
+        image_parts.append(types.Part.from_bytes(data=raw, mime_type=mime))
+        return "", image_parts
+
+    if name.endswith(".txt"):
+        return raw.decode("utf-8", errors="replace"), image_parts
+
+    if name.endswith(".pdf"):
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(io.BytesIO(raw))
+            pages = [p.extract_text() or "" for p in reader.pages]
+            return "\n".join(pages).strip(), image_parts
+        except Exception as exc:
+            return f"[Could not read PDF: {exc}]", image_parts
+
+    if name.endswith(".docx"):
+        try:
+            from docx import Document
+            doc = Document(io.BytesIO(raw))
+            return "\n".join(p.text for p in doc.paragraphs if p.text).strip(), image_parts
+        except Exception as exc:
+            return f"[Could not read Word file: {exc}]", image_parts
+
+    return "[Unsupported file type. Use .txt, .pdf, .docx, or an image.]", image_parts
+
+
 def create_pdf_bytes(title: str, body: str) -> bytes:
     from fpdf import FPDF
 
@@ -148,14 +198,17 @@ def create_pdf_bytes(title: str, body: str) -> bytes:
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
-    pdf.multi_cell(0, 10, title[:120])
+    pdf.multi_cell(0, 10, title[:120], new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
     pdf.set_font("Helvetica", size=11)
     for line in body.replace("\r", "").split("\n"):
         safe = line.encode("latin-1", errors="replace").decode("latin-1")
-        pdf.multi_cell(0, 6, safe)
+        pdf.multi_cell(0, 6, safe, new_x="LMARGIN", new_y="NEXT")
     out = pdf.output()
-    return out if isinstance(out, bytes) else out.encode("latin-1")
+    if isinstance(out, str):
+        return out.encode("latin-1")
+    return bytes(out)
+
 
 
 def create_docx_bytes(title: str, body: str) -> bytes:

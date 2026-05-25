@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SHIKSHA — Teaching Assistant 📚</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+/* ── Reset & Base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --yellow:   #feca57;
+  --orange:   #ff9f43;
+  --red:      #ff6b6b;
+  --green:    #1dd1a1;
+  --green2:   #10ac84;
+  --blue:     #54a0ff;
+  --purple:   #a29bfe;
+  --pink:     #fd79a8;
+  --white:    #ffffff;
+  --cream:    #fffdf5;
+  --dark:     #2d3436;
+  --grey:     #636e72;
+  --light-grey: #dfe6e9;
+  --card-bg:  rgba(255,255,255,0.88);
+  --radius:   18px;
+  --shadow:   0 8px 32px rgba(0,0,0,0.10);
+}
+
+html, body {
+  font-family: 'Fredoka', sans-serif;
+  min-height: 100vh;
+  color: var(--dark);
+  overflow-x: hidden;
+}
+
+/* ── Kids-friendly soft static background ────────────────── */
+body {
+  background: linear-gradient(160deg, #fff9f0 0%, #f0f7ff 45%, #f5fff9 75%, #fff0f8 100%);
+}
+
+/* ── Floating educational characters layer ───────────────── */
+#bgChars {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.bgc {
+  position: absolute;
+  bottom: -60px;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 700;
+  color: #5a3fa0;
+  opacity: 0;
+  user-select: none;
+  animation: riseUp linear infinite;
+}
+
+@keyframes riseUp {
+  0%   { transform: translateY(0)   rotate(0deg)  scale(1);    opacity: 0; }
+  8%   { opacity: 0.09; }
+  88%  { opacity: 0.09; }
+  100% { transform: translateY(-110vh) rotate(25deg) scale(1.1); opacity: 0; }
+}
+
+/* ── Layout ──────────────────────────────────────────────── */
+.wrapper { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; }
+
+/* ── Header ──────────────────────────────────────────────── */
+.header { text-align: center; padding: 20px 0 10px; }
+
+.main-title {
+  font-size: clamp(2.8rem, 7vw, 4.5rem);
+  font-weight: 700;
+  background: linear-gradient(135deg, #ff6b6b 0%, #feca57 40%, #1dd1a1 80%, #54a0ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.1;
+  filter: drop-shadow(2px 3px 0px rgba(0,0,0,0.08));
+}
+
+.sub-title { font-size: 1.2rem; color: #4a4a6a; font-weight: 400; margin-top: 4px; }
+
+.badge-row { margin: 12px 0 4px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #ffeaa7, #ffd2df);
+  border: 2px solid var(--yellow);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--dark);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.10);
+  transition: transform 0.2s;
+}
+.badge:hover { transform: scale(1.07); }
+
+/* ── Status banner ───────────────────────────────────────── */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--card-bg);
+  border: 2px solid var(--yellow);
+  border-radius: var(--radius);
+  padding: 10px 20px;
+  margin: 16px 0;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+}
+.status-dot {
+  width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+  transition: background 0.3s;
+}
+.status-idle    { background: #8395a7; }
+.status-starting{ background: var(--yellow); animation: pulseDot 1.5s infinite; }
+.status-running { background: var(--green);  animation: pulseDot 1.5s infinite; }
+.status-stopped { background: var(--orange); }
+.status-error   { background: var(--red); }
+@keyframes pulseDot {
+  0%  { box-shadow: 0 0 0 0 rgba(29,209,161,0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(29,209,161,0); }
+  100%{ box-shadow: 0 0 0 0 rgba(29,209,161,0); }
+}
+.status-label { font-weight: 700; font-size: 1rem; text-transform: uppercase; letter-spacing: 1.5px; color: #4a4a6a; }
+
+/* ── Card ────────────────────────────────────────────────── */
+.card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+  border: 2px solid rgba(255,255,255,0.6);
+  margin-bottom: 20px;
+}
+.card-title { font-size: 1.35rem; font-weight: 700; margin-bottom: 14px; color: var(--dark); }
+
+/* ── Tabs ────────────────────────────────────────────────── */
+.tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.tab-btn {
+  flex: 1; min-width: 140px;
+  padding: 12px 18px;
+  border: 2px solid rgba(255,255,255,0.7);
+  border-radius: 14px 14px 0 0;
+  background: rgba(255,255,255,0.5);
+  font-family: 'Fredoka', sans-serif;
+  font-size: 1.05rem; font-weight: 600;
+  cursor: pointer;
+  color: var(--grey);
+  transition: all 0.2s;
+}
+.tab-btn:hover { background: rgba(255,255,255,0.75); color: var(--dark); }
+.tab-btn.active {
+  background: var(--yellow);
+  color: var(--dark);
+  border-color: var(--yellow);
+  border-bottom-color: var(--yellow);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 20px; border-radius: 14px;
+  font-family: 'Fredoka', sans-serif; font-size: 1.02rem; font-weight: 600;
+  cursor: pointer; border: 2px solid var(--yellow);
+  background: white; color: var(--dark);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.10);
+  transition: all 0.2s; white-space: nowrap;
+}
+.btn:hover { background: var(--yellow); transform: translateY(-2px) scale(1.02); box-shadow: 0 6px 16px rgba(0,0,0,0.15); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+.btn-primary {
+  background: linear-gradient(135deg, var(--green) 0%, var(--green2) 100%);
+  color: white; border-color: transparent;
+}
+.btn-primary:hover { background: linear-gradient(135deg, var(--green2), var(--green)); }
+.btn-danger { background: var(--red); color: white; border-color: transparent; }
+.btn-danger:hover { background: #e55353; }
+.btn-full { width: 100%; }
+
+/* ── Inputs ──────────────────────────────────────────────── */
+input[type="text"], input[type="number"], textarea, select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 2px solid var(--light-grey);
+  border-radius: 12px;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 1rem;
+  background: rgba(255,255,255,0.9);
+  color: var(--dark);
+  transition: border-color 0.2s;
+  outline: none;
+}
+input:focus, textarea:focus { border-color: var(--yellow); }
+textarea { resize: vertical; min-height: 90px; }
+label { font-weight: 600; font-size: 0.95rem; margin-bottom: 4px; display: block; color: #4a4a6a; }
+
+/* ── Grid helpers ────────────────────────────────────────── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.grid-3-1 { display: grid; grid-template-columns: 3fr 1fr; gap: 14px; }
+@media(max-width:640px){ .grid-2,.grid-3-1 { grid-template-columns: 1fr; } }
+
+/* ── Chat ────────────────────────────────────────────────── */
+.chat-box {
+  background: rgba(255,255,255,0.6);
+  border: 2px solid var(--light-grey);
+  border-radius: var(--radius);
+  padding: 14px;
+  min-height: 200px; max-height: 380px;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.chat-empty { text-align: center; color: var(--grey); margin: auto; padding: 32px 0; font-size: 0.98rem; }
+.msg { display: flex; gap: 10px; align-items: flex-start; }
+.msg.user { flex-direction: row-reverse; }
+.msg-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+.msg.user .msg-avatar { background: linear-gradient(135deg, var(--blue), var(--purple)); }
+.msg.assistant .msg-avatar { background: linear-gradient(135deg, var(--green), var(--yellow)); }
+.msg.system .msg-avatar { background: var(--light-grey); }
+.msg-bubble {
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 0.97rem;
+  max-width: 78%;
+  line-height: 1.5;
+}
+.msg.user .msg-bubble { background: linear-gradient(135deg, var(--blue), var(--purple)); color: white; border-radius: 16px 4px 16px 16px; }
+.msg.assistant .msg-bubble { background: white; color: var(--dark); border-radius: 4px 16px 16px 16px; border: 1.5px solid var(--light-grey); }
+.msg.system .msg-bubble { background: #e8f5e9; color: #2e7d32; border-radius: 12px; font-size: 0.88rem; }
+
+/* ── Homework board ──────────────────────────────────────── */
+.hw-board {
+  background: rgba(255,255,255,0.75);
+  border: 3px dashed var(--orange);
+  border-radius: var(--radius);
+  padding: 16px;
+  font-size: 0.97rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  min-height: 60px;
+}
+
+/* ── Student profile card ────────────────────────────────── */
+.profile-card {
+  background: linear-gradient(135deg, rgba(254,202,87,0.12), rgba(253,121,168,0.08));
+  border: 2px solid var(--yellow);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.profile-card h3 { color: var(--orange); font-size: 1.4rem; margin-bottom: 12px; }
+.profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 1rem; }
+@media(max-width:480px){ .profile-grid { grid-template-columns: 1fr; } }
+.profile-grid span { background: rgba(255,255,255,0.7); padding: 4px 10px; border-radius: 8px; font-weight: 600; }
+
+/* ── Alert / toast ───────────────────────────────────────── */
+.alert {
+  padding: 12px 16px; border-radius: 12px;
+  margin: 10px 0; font-size: 0.97rem; font-weight: 500;
+}
+.alert-success { background: #d4edda; color: #155724; border: 1.5px solid #c3e6cb; }
+.alert-error   { background: #f8d7da; color: #721c24; border: 1.5px solid #f5c6cb; }
+.alert-info    { background: #d1ecf1; color: #0c5460; border: 1.5px solid #bee5eb; }
+.alert-warn    { background: #fff3cd; color: #856404; border: 1.5px solid #ffeeba; }
+
+/* ── Loader spinner ──────────────────────────────────────── */
+.spinner {
+  border: 4px solid rgba(255,255,255,0.4);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  width: 28px; height: 28px;
+  animation: spin 0.8s linear infinite;
+  display: inline-block; vertical-align: middle; margin-right: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Collapsible ─────────────────────────────────────────── */
+details summary { cursor: pointer; font-weight: 600; color: #4a4a6a; padding: 8px 0; }
+details summary:hover { color: var(--dark); }
+
+/* ── Stars / fun decoration ──────────────────────────────── */
+.star-row { text-align: center; font-size: 1.4rem; margin: 10px 0; letter-spacing: 4px; }
+
+/* ── Report card ─────────────────────────────────────────── */
+.report-card-output {
+  background: rgba(255,255,255,0.85);
+  border: 2px solid var(--purple);
+  border-radius: var(--radius);
+  padding: 20px;
+  white-space: pre-wrap;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+/* ── Student pill list ───────────────────────────────────── */
+.student-pill-list { display: flex; flex-direction: column; gap: 6px; }
+.student-pill {
+  background: rgba(255,255,255,0.7);
+  border: 1.5px solid var(--light-grey);
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 0.95rem;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.student-pill strong { color: var(--dark); }
+.student-pill code { background: #ffeaa7; padding: 2px 8px; border-radius: 6px; font-size: 0.85rem; }
+.select-btn { padding: 4px 12px; font-size: 0.88rem; }
+
+.divider { border: none; border-top: 2px dashed rgba(0,0,0,0.10); margin: 20px 0; }
+</style>
+</head>
+<body>
+<!-- ── Floating educational background characters ── -->
+<div id="bgChars" aria-hidden="true"></div>
+
+<div class="wrapper">
+
+  <!-- ── Header ── -->
+  <div class="header">
+    <h1 class="main-title">{{ assistant_name }}</h1>
+    <p class="sub-title">Your AI teaching assistant — live lessons, homework, and feedback</p>
+    <div class="badge-row">
+      <span class="badge">🎙️ Live voice class</span>
+      <span class="badge">📝 Homework writer</span>
+      <span class="badge">📄 PDF &amp; Word export</span>
+      <span class="badge">✅ Submit &amp; check work</span>
+      <span class="badge">👨‍👩‍👧 Parent report card</span>
+    </div>
+  </div>
+
+  <!-- ── Status bar ── -->
+  <div class="status-bar" id="statusBar">
+    <span class="status-dot status-{{ status }}" id="statusDot"></span>
+    <span class="status-label" id="statusLabel">{{ status }}</span>
+    {% if status == "running" %}<span style="color:var(--grey);font-size:0.9rem;">· {{ model }}</span>{% endif %}
+  </div>
+  {% if error %}<div class="alert alert-error">⚠️ {{ error }}</div>{% endif %}
+
+  <!-- ── Student banner ── -->
+  {% if student %}
+  <div class="alert alert-success">
+    🎒 <strong>{{ student.child_name }}</strong> &nbsp;·&nbsp; Student ID: <code>{{ student.student_id }}</code>
+    &nbsp;— share this with parents for reports!
+  </div>
+  {% endif %}
+
+  <!-- ── Tabs ── -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('live', this)">🎙️ Live class</button>
+    <button class="tab-btn" onclick="switchTab('homework', this)">📝 Homework &amp; tasks</button>
+    <button class="tab-btn" onclick="switchTab('parent', this)">👨‍👩‍👧 Parent corner</button>
+  </div>
+
+  <!-- ═══════════ LIVE CLASS TAB ═══════════ -->
+  <div id="tab-live" class="tab-panel active">
+
+    <div class="card">
+      <div class="card-title">🎙️ Live voice class</div>
+
+      <!-- Session form -->
+      <div id="sessionForm" {% if status in ['running', 'starting'] %}style="display:none"{% endif %}>
+        <p style="color:var(--grey);margin-bottom:14px;">Fill in your details and start a live lesson with <strong>{{ assistant_name }}</strong>!</p>
+        <div class="grid-2" style="margin-bottom:10px;">
+          <div>
+            <label>Child's name *</label>
+            <input type="text" id="childName" placeholder="e.g. Mitansh" value="{{ student.child_name if student else '' }}"/>
+          </div>
+          <div>
+            <label>Student ID (returning students)</label>
+            <input type="text" id="studentId" placeholder="e.g. S1, S2…" value="{{ student.student_id if student else '' }}"/>
+          </div>
+        </div>
+        <div class="grid-2" style="margin-bottom:10px;">
+          <div>
+            <label>Age</label>
+            <input type="text" id="childAge" placeholder="e.g. 8" value="{{ student.age if student else '' }}"/>
+          </div>
+          <div>
+            <label>Class / Grade</label>
+            <input type="text" id="childGrade" placeholder="e.g. Class 3" value="{{ student.grade if student else '' }}"/>
+          </div>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label>Parent name</label>
+          <input type="text" id="parentName" placeholder="e.g. Mrs. Sharma" value="{{ student.parent_name if student else '' }}"/>
+        </div>
+        <div id="startAlert"></div>
+        <button class="btn btn-primary btn-full" onclick="startSession()">🚀 Start my lesson!</button>
+      </div>
+
+      <!-- Running state -->
+      <div id="sessionRunning" {% if status not in ['running', 'starting'] %}style="display:none"{% endif %}>
+        <div class="alert alert-info" style="margin-bottom:12px;">
+          🎉 Lesson is live! Speak naturally. Click Stop when you are finished.
+        </div>
+        <button class="btn btn-danger btn-full" onclick="stopSession()">⏹️ Stop lesson</button>
+      </div>
+    </div>
+
+    <!-- Live tasks loaded -->
+    <div id="loadedTasksSection" class="card" {% if not (homework_board or generated_homework) %}style="display:none"{% endif %}>
+      <details>
+        <summary>📋 Tasks loaded for this lesson</summary>
+        <div class="hw-board" style="margin-top:10px;" id="loadedTasksText">{{ homework_board or generated_homework }}</div>
+      </details>
+    </div>
+
+    <!-- Conversation -->
+    <div class="card">
+      <div class="card-title">💬 Live conversation</div>
+      <div class="chat-box" id="chatBox">
+        {% if not messages %}
+        <div class="chat-empty">Start a lesson and speak naturally. {{ assistant_name }} will teach, assign tasks, and discuss homework!</div>
+        {% else %}
+          {% for msg in messages %}
+          <div class="msg {{ msg.role }}">
+            <div class="msg-avatar">{% if msg.role == 'user' %}🧒{% elif msg.role == 'assistant' %}📚{% else %}ℹ️{% endif %}</div>
+            <div class="msg-bubble">{{ msg.text }}</div>
+          </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+      {% if status in ['running', 'starting'] or interruptions > 0 %}
+      <p style="font-size:0.85rem;color:var(--grey);margin-top:8px;">Interruptions: {{ interruptions }} · Model: {{ model }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ═══════════ HOMEWORK TAB ═══════════ -->
+  <div id="tab-homework" class="tab-panel">
+
+    <!-- Board -->
+    <div class="card">
+      <div class="card-title">📌 Task &amp; homework board</div>
+      <p style="font-size:0.92rem;color:var(--grey);margin-bottom:12px;">
+        {{ assistant_name }} uses this board to assign work in voice class and to generate printable sheets.
+      </p>
+      <div class="grid-2" style="align-items:start;">
+        <div>
+          <textarea id="homeworkBoard" rows="6" placeholder="Example:&#10;- Math: 10 addition sums (two digits)&#10;- English: Write 5 sentences using 'because'&#10;- Hindi: Learn poem first two lines&#10;- Due: tomorrow evening">{{ homework_board }}</textarea>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div>
+            <label>Grade / age (optional)</label>
+            <input type="text" id="gradeHint" placeholder="e.g. Class 2, age 7" value="{{ grade_hint }}"/>
+          </div>
+          <div class="grid-2">
+            <button class="btn" onclick="saveBoard()">💾 Save</button>
+            <button class="btn btn-danger" onclick="clearBoard()">🗑️ Clear</button>
+          </div>
+        </div>
+      </div>
+      <div id="boardAlert" style="margin-top:8px;"></div>
+
+      <!-- Quick add topic -->
+      <hr class="divider"/>
+      <p style="font-weight:600;margin-bottom:8px;">➕ Add homework for a topic:</p>
+      <div class="grid-3-1">
+        <input type="text" id="quickTopic" placeholder="e.g. Multiplication tables, English sentences…"/>
+        <button class="btn" onclick="addTopic()">➕ Add</button>
+      </div>
+
+      <!-- Current board display -->
+      <div id="boardDisplay" style="margin-top:14px; {% if not homework_board %}display:none{% endif %}">
+        <p style="font-weight:600;margin-bottom:6px;">Current board:</p>
+        <div class="hw-board" id="boardText">{{ homework_board }}</div>
+      </div>
+    </div>
+
+    <!-- Generate sheet -->
+    <div class="card">
+      <div class="card-title">✍️ Create homework sheet</div>
+      <div class="grid-2" style="margin-bottom:14px;">
+        <button class="btn btn-primary" onclick="generateHomework()">🤖 Ask {{ assistant_name }} to write homework</button>
+        <p style="font-size:0.9rem;color:var(--grey);align-self:center;">Export as PDF or Word after generating.</p>
+      </div>
+      <div id="generateAlert"></div>
+
+      <div id="generatedSection" style="{% if not generated_homework %}display:none{% endif %}">
+        <textarea id="generatedHomework" rows="8" style="margin-bottom:12px;">{{ generated_homework }}</textarea>
+        <div class="grid-2">
+          <a href="/homework/download-pdf" class="btn" style="text-decoration:none;display:flex;align-items:center;justify-content:center;">📄 Download PDF</a>
+          <a href="/homework/download-docx" class="btn" style="text-decoration:none;display:flex;align-items:center;justify-content:center;">📘 Download Word</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit & check -->
+    <div class="card">
+      <div class="card-title">✅ Submit homework for checking</div>
+      <p style="font-size:0.9rem;color:var(--grey);margin-bottom:14px;">Upload a photo, PDF, Word file, or paste answers. {{ assistant_name }} will review kindly.</p>
+      <div class="grid-2" style="margin-bottom:12px;">
+        <div>
+          <label>Upload homework</label>
+          <input type="file" id="hwFile" accept=".png,.jpg,.jpeg,.webp,.pdf,.docx,.txt" style="padding:8px;border-radius:10px;border:2px dashed var(--light-grey);background:rgba(255,255,255,0.7);width:100%;"/>
+        </div>
+        <div>
+          <label>Or paste answers here</label>
+          <textarea id="submissionNotes" rows="3" placeholder="Type answers here…">{{ submission_notes }}</textarea>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="checkHomework()">🔍 Check my homework</button>
+      <div id="checkAlert" style="margin-top:10px;"></div>
+      <div id="checkResult" style="margin-top:14px;{% if not check_result %}display:none{% endif %}">
+        <p style="font-weight:700;margin-bottom:8px;">📋 Feedback:</p>
+        <div style="background:rgba(255,255,255,0.8);border-radius:12px;padding:16px;white-space:pre-wrap;border:2px solid var(--light-grey);">{{ check_result }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ PARENT CORNER TAB ═══════════ -->
+  <div id="tab-parent" class="tab-panel">
+
+    <div class="card">
+      <div class="card-title">👨‍👩‍👧 Parent corner</div>
+      <p style="font-size:0.9rem;color:var(--grey);margin-bottom:14px;">
+        Search by <strong>child name</strong> or <strong>Student ID</strong> (e.g. S1). Once loaded, check progress, generate report cards, and chat with {{ assistant_name }}.
+      </p>
+
+      <!-- Search -->
+      <div class="grid-3-1" style="margin-bottom:10px;">
+        <input type="text" id="parentSearch" placeholder="e.g. Mitansh or S1"/>
+        <button class="btn" onclick="searchStudent()">🔍 Find child</button>
+      </div>
+      <div id="searchResults"></div>
+
+      <!-- All students -->
+      <details style="margin-top:14px;">
+        <summary>All registered students ({{ students_list|length }})</summary>
+        <div class="student-pill-list" style="margin-top:10px;">
+          {% for s in students_list %}
+          <div class="student-pill">
+            <div><strong>{{ s.child_name }}</strong> &nbsp;—&nbsp; <code>{{ s.student_id }}</code>{% if s.grade %} &nbsp;· Class {{ s.grade }}{% endif %}</div>
+            <button class="btn select-btn" onclick="loadStudent('{{ s.student_id }}')">Select</button>
+          </div>
+          {% endfor %}
+        </div>
+      </details>
+    </div>
+
+    <!-- Profile -->
+    <div id="profileSection" style="{% if not student %}display:none{% endif %}">
+
+      <div class="profile-card" id="profileCard">
+        {% if student %}
+        <h3>🎒 {{ student.child_name }}'s Learning Profile</h3>
+        <div class="profile-grid">
+          <div>🆔 Student ID: <span>{{ student.student_id }}</span></div>
+          <div>🏫 Class: <span>{{ student.grade or '—' }}</span></div>
+          <div>🎂 Age: <span>{{ student.age or '—' }}</span></div>
+          <div>👨‍👩‍👧 Parent: <span>{{ student.parent_name or '—' }}</span></div>
+        </div>
+        {% if student.notes %}<p style="margin-top:12px;">📝 <strong>Notes:</strong> {{ student.notes }}</p>{% endif %}
+        {% endif %}
+      </div>
+
+      <div class="grid-2" style="align-items:start;">
+
+        <!-- Chat -->
+        <div class="card" style="margin-bottom:0">
+          <div class="card-title">💬 Talk to {{ assistant_name }} (parent)</div>
+          <div class="chat-box" id="parentChatBox" style="min-height:240px;">
+            {% if not parent_chat %}
+            <div class="chat-empty">Ask {{ assistant_name }}: "How did Arjun perform today?" or "What are his strengths?"</div>
+            {% else %}
+              {% for msg in parent_chat %}
+              <div class="msg {{ 'user' if msg.role == 'parent' else 'assistant' }}">
+                <div class="msg-avatar">{{ '👨‍👩‍👧' if msg.role == 'parent' else '📚' }}</div>
+                <div class="msg-bubble">{{ msg.text }}</div>
+              </div>
+              {% endfor %}
+            {% endif %}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <input type="text" id="parentMsg" placeholder="Ask {{ assistant_name }} about your child…" style="flex:1;" onkeydown="if(event.key==='Enter')sendParentMsg()"/>
+            <button class="btn btn-primary" onclick="sendParentMsg()">Send</button>
+          </div>
+          <button class="btn" style="margin-top:8px;width:100%;" onclick="clearParentChat()">🗑️ Clear chat</button>
+        </div>
+
+        <!-- Report card -->
+        <div class="card" style="margin-bottom:0">
+          <div class="card-title">📋 Full report card</div>
+          <textarea id="reportNotes" rows="3" placeholder="e.g. Focus on English speaking this month…">{{ parent_report_notes }}</textarea>
+          <button class="btn btn-primary btn-full" style="margin-top:10px;" onclick="generateReport()">📋 Generate report card</button>
+          <div id="reportAlert" style="margin-top:8px;"></div>
+          <div id="reportOutput" style="margin-top:14px;{% if not report_card %}display:none{% endif %}">
+            <div class="report-card-output" id="reportText">{{ report_card }}</div>
+            <a href="/parent/download-report-pdf" class="btn btn-full" style="text-decoration:none;display:flex;align-items:center;justify-content:center;margin-top:10px;">📄 Download Report PDF</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- .wrapper -->
+
+<script>
+// ── Tab switching ──────────────────────────────────────────
+function switchTab(name, btn){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Helper ─────────────────────────────────────────────────
+function setAlert(id, html, type='info'){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.innerHTML=`<div class="alert alert-${type}">${html}</div>`;
+}
+function clearAlert(id){ const el=document.getElementById(id); if(el) el.innerHTML=''; }
+
+async function post(url, data){
+  const fd=new FormData();
+  for(const [k,v] of Object.entries(data)) fd.append(k,v??'');
+  const r=await fetch(url,{method:'POST',body:fd});
+  return r.json();
+}
+
+// ── Session ────────────────────────────────────────────────
+async function startSession(){
+  const name=document.getElementById('childName').value.trim();
+  if(!name){ setAlert('startAlert','Please enter the child\'s name.','error'); return; }
+  setAlert('startAlert','<span class="spinner"></span> Starting…','info');
+  const res=await post('/session/start',{
+    child_name: name,
+    age: document.getElementById('childAge').value,
+    grade: document.getElementById('childGrade').value,
+    parent_name: document.getElementById('parentName').value,
+    student_id: document.getElementById('studentId').value,
+  });
+  if(res.ok){
+    setAlert('startAlert',`🎉 Session started! Student ID: <strong>${res.student_id}</strong> — save this!`,'success');
+    document.getElementById('sessionForm').style.display='none';
+    document.getElementById('sessionRunning').style.display='block';
+    startPolling();
+  } else {
+    setAlert('startAlert', res.error||'Failed to start.','error');
+  }
+}
+
+async function stopSession(){
+  await fetch('/session/stop',{method:'POST'});
+  document.getElementById('sessionRunning').style.display='none';
+  document.getElementById('sessionForm').style.display='block';
+  updateStatus('stopped');
+}
+
+// ── Status polling ─────────────────────────────────────────
+let pollTimer=null;
+function startPolling(){ if(!pollTimer) pollTimer=setInterval(pollStatus,2500); }
+function stopPolling(){ clearInterval(pollTimer); pollTimer=null; }
+
+async function pollStatus(){
+  try {
+    const snap=await (await fetch('/session/status')).json();
+    updateStatus(snap.status, snap.model, snap.messages, snap.interruptions, snap.error);
+    if(snap.status==='stopped'||snap.status==='idle'||snap.status==='error') stopPolling();
+  } catch(e){}
+}
+
+function updateStatus(status, model='', messages=null, interruptions=0, error=''){
+  const dot=document.getElementById('statusDot');
+  const lbl=document.getElementById('statusLabel');
+  if(dot){ dot.className='status-dot status-'+status; }
+  if(lbl){ lbl.textContent=status+(model?' · '+model:''); }
+
+  if(messages) renderMessages(messages);
+  if(status==='stopped'||status==='idle'){
+    document.getElementById('sessionRunning').style.display='none';
+    document.getElementById('sessionForm').style.display='block';
+  }
+  if(status==='running'||status==='starting'){
+    document.getElementById('sessionForm').style.display='none';
+    document.getElementById('sessionRunning').style.display='block';
+  }
+}
+
+function renderMessages(msgs){
+  const box=document.getElementById('chatBox');
+  if(!box) return;
+  if(!msgs.length){
+    box.innerHTML='<div class="chat-empty">Start a lesson and speak naturally. SHIKSHA will teach, assign tasks, and discuss homework!</div>';
+    return;
+  }
+  box.innerHTML=msgs.map(m=>{
+    const icon = m.role==='user'?'🧒':m.role==='assistant'?'📚':'ℹ️';
+    return `<div class="msg ${m.role}">
+      <div class="msg-avatar">${icon}</div>
+      <div class="msg-bubble">${escHtml(m.text)}</div>
+    </div>`;
+  }).join('');
+  box.scrollTop=box.scrollHeight;
+}
+
+function escHtml(t){ const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
+
+// ── Homework ────────────────────────────────────────────────
+async function saveBoard(){
+  const res=await post('/homework/save-board',{
+    board: document.getElementById('homeworkBoard').value,
+    grade_hint: document.getElementById('gradeHint').value,
+  });
+  setAlert('boardAlert','✅ Saved!','success');
+  updateBoardDisplay();
+  setTimeout(()=>clearAlert('boardAlert'),3000);
+}
+
+async function clearBoard(){
+  await fetch('/homework/clear',{method:'POST'});
+  document.getElementById('homeworkBoard').value='';
+  document.getElementById('generatedHomework') && (document.getElementById('generatedHomework').value='');
+  document.getElementById('generatedSection').style.display='none';
+  document.getElementById('boardDisplay').style.display='none';
+}
+
+async function addTopic(){
+  const topic=document.getElementById('quickTopic').value.trim();
+  const grade=document.getElementById('gradeHint').value;
+  if(!topic){ setAlert('boardAlert','Enter a topic first.','warn'); return; }
+  const res=await post('/homework/add-topic',{topic, grade_hint:grade});
+  if(res.ok){
+    document.getElementById('homeworkBoard').value=res.board;
+    document.getElementById('quickTopic').value='';
+    updateBoardDisplay();
+  }
+}
+
+function updateBoardDisplay(){
+  const board=document.getElementById('homeworkBoard').value.trim();
+  const display=document.getElementById('boardDisplay');
+  const text=document.getElementById('boardText');
+  if(board){ display.style.display='block'; if(text) text.textContent=board; }
+  else display.style.display='none';
+}
+
+async function generateHomework(){
+  setAlert('generateAlert','<span class="spinner"></span> Asking SHIKSHA…','info');
+  const res=await post('/homework/generate',{});
+  if(res.ok){
+    clearAlert('generateAlert');
+    document.getElementById('generatedHomework').value=res.homework;
+    document.getElementById('generatedSection').style.display='block';
+  } else {
+    setAlert('generateAlert', res.error||'Failed.','error');
+  }
+}
+
+async function checkHomework(){
+  setAlert('checkAlert','<span class="spinner"></span> SHIKSHA is checking…','info');
+  const fd=new FormData();
+  fd.append('submission_notes',document.getElementById('submissionNotes').value);
+  const file=document.getElementById('hwFile').files[0];
+  if(file) fd.append('file',file);
+  const res=await(await fetch('/homework/check',{method:'POST',body:fd})).json();
+  if(res.ok){
+    clearAlert('checkAlert');
+    document.getElementById('checkResult').style.display='block';
+    document.getElementById('checkResult').querySelector('div').textContent=res.result;
+  } else {
+    setAlert('checkAlert',res.error||'Check failed.','error');
+  }
+}
+
+// ── Parent corner ──────────────────────────────────────────
+async function searchStudent(){
+  const q=document.getElementById('parentSearch').value.trim();
+  if(!q) return;
+  const res=await post('/parent/search',{query:q});
+  const el=document.getElementById('searchResults');
+  if(!res.ok){ el.innerHTML=`<div class="alert alert-warn">${res.error}</div>`; return; }
+  const students=res.students;
+  if(students.length===1){ loadStudent(students[0].student_id); el.innerHTML=''; return; }
+  el.innerHTML='<p style="font-weight:600;margin:10px 0 6px;">Several matches — pick one:</p>'
+    +students.map(s=>`<div class="student-pill" style="margin-bottom:6px;">
+      <span><strong>${escHtml(s.child_name)}</strong> · <code>${s.student_id}</code>${s.grade?' · Class '+escHtml(s.grade):''}</span>
+      <button class="btn select-btn" onclick="loadStudent('${s.student_id}')">Select</button>
+    </div>`).join('');
+}
+
+async function loadStudent(sid){
+  const res=await post('/parent/load-student',{student_id:sid});
+  if(!res.ok){ alert(res.error); return; }
+  const s=res.student;
+  // Update profile card
+  document.getElementById('profileSection').style.display='block';
+  document.getElementById('profileCard').innerHTML=`
+    <h3>🎒 ${escHtml(s.child_name)}'s Learning Profile</h3>
+    <div class="profile-grid">
+      <div>🆔 Student ID: <span>${escHtml(s.student_id)}</span></div>
+      <div>🏫 Class: <span>${escHtml(s.grade||'—')}</span></div>
+      <div>🎂 Age: <span>${escHtml(s.age||'—')}</span></div>
+      <div>👨‍👩‍👧 Parent: <span>${escHtml(s.parent_name||'—')}</span></div>
+    </div>
+    ${s.notes?`<p style="margin-top:12px;">📝 <strong>Notes:</strong> ${escHtml(s.notes)}</p>`:''}
+  `;
+  document.getElementById('parentChatBox').innerHTML=
+    '<div class="chat-empty">Ask SHIKSHA about '+escHtml(s.child_name)+'…</div>';
+  document.getElementById('reportOutput').style.display='none';
+  document.getElementById('searchResults').innerHTML='';
+}
+
+async function sendParentMsg(){
+  const msg=document.getElementById('parentMsg').value.trim();
+  if(!msg) return;
+  document.getElementById('parentMsg').value='';
+  appendParentMsg('user',msg);
+  const res=await post('/parent/chat',{message:msg});
+  appendParentMsg('assistant', res.ok? res.reply : (res.error||'Error'));
+}
+
+function appendParentMsg(role, text){
+  const box=document.getElementById('parentChatBox');
+  const empty=box.querySelector('.chat-empty');
+  if(empty) empty.remove();
+  const icon=role==='user'?'👨‍👩‍👧':'📚';
+  const div=document.createElement('div');
+  div.className='msg '+(role==='user'?'user':'assistant');
+  div.innerHTML=`<div class="msg-avatar">${icon}</div><div class="msg-bubble">${escHtml(text)}</div>`;
+  box.appendChild(div);
+  box.scrollTop=box.scrollHeight;
+}
+
+async function clearParentChat(){
+  await fetch('/parent/clear-chat',{method:'POST'});
+  document.getElementById('parentChatBox').innerHTML='<div class="chat-empty">Ask SHIKSHA about your child…</div>';
+}
+
+async function generateReport(){
+  setAlert('reportAlert','<span class="spinner"></span> Writing report card…','info');
+  const res=await post('/parent/report',{extra_notes:document.getElementById('reportNotes').value});
+  if(res.ok){
+    clearAlert('reportAlert');
+    document.getElementById('reportOutput').style.display='block';
+    document.getElementById('reportText').textContent=res.report;
+  } else {
+    setAlert('reportAlert',res.error||'Failed.','error');
+  }
+}
+
+// ── Floating educational background chars ──────────────────
+(function spawnBgChars(){
+  const pool = [
+    'A','B','C','D','E','F','G','H','I','J','K','L','M',
+    'N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
+    'a','b','c','d','e','f','g','h','i','j','k','l','m',
+    'n','o','p','q','r','s','t','u','v','w','x','y','z',
+    '1','2','3','4','5','6','7','8','9','0',
+    '+','−','×','÷','=','?','!',
+    'α','β','π',
+    'ABC','123','XYZ',
+  ];
+  // Colour palette — soft purples, blues, greens
+  const colours = ['#6c5ce7','#0984e3','#00b894','#e17055','#fd79a8','#fdcb6e','#6ab04c'];
+  const container = document.getElementById('bgChars');
+  const COUNT = 30;
+
+  for(let i = 0; i < COUNT; i++){
+    const el = document.createElement('span');
+    el.className = 'bgc';
+    el.textContent = pool[Math.floor(Math.random() * pool.length)];
+
+    // Random position, size, speed, delay
+    const left   = Math.random() * 98;        // vw
+    const size   = 18 + Math.random() * 42;   // px
+    const dur    = 18  + Math.random() * 28;  // seconds
+    const delay  = -(Math.random() * dur);    // stagger start
+    const colour = colours[Math.floor(Math.random() * colours.length)];
+
+    el.style.cssText =
+      `left:${left}vw;font-size:${size}px;color:${colour};` +
+      `animation-duration:${dur}s;animation-delay:${delay}s;`;
+
+    container.appendChild(el);
+  }
+})();
+
+// ── Init ───────────────────────────────────────────────────
+(function init(){
+  // If session already running on load, start polling
+  const statusLabel=document.getElementById('statusLabel');
+  if(statusLabel && (statusLabel.textContent.trim()==='running'||statusLabel.textContent.trim()==='starting')){
+    startPolling();
+  }
+  // Sync board display
+  updateBoardDisplay();
+})();
+</script>
+</body>
+</html>
