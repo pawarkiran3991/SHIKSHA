@@ -326,6 +326,59 @@ details summary:hover { color: var(--dark); }
 .select-btn { padding: 4px 12px; font-size: 0.88rem; }
 
 .divider { border: none; border-top: 2px dashed rgba(0,0,0,0.10); margin: 20px 0; }
+
+/* ── Teaching mini screen ────────────────────────────────── */
+.teaching-screen {
+  background: linear-gradient(145deg, #dfe6e9 0%, #b2bec3 100%);
+  border: 3px solid var(--blue);
+  border-radius: var(--radius);
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  text-align: center;
+  box-shadow: inset 0 4px 12px rgba(0,0,0,0.08);
+}
+.teaching-screen img {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 12px;
+  object-fit: contain;
+}
+.teaching-screen .screen-label {
+  font-size: 0.85rem;
+  color: var(--grey);
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+/* ── Progress chart bars ─────────────────────────────────── */
+.chart-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
+.chart-stat {
+  background: rgba(255,255,255,0.85);
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+  border: 2px solid var(--light-grey);
+}
+.chart-stat .num { font-size: 1.6rem; font-weight: 700; color: var(--green2); }
+.chart-stat .lbl { font-size: 0.82rem; color: var(--grey); }
+
+.task-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.75);
+  border-radius: 10px;
+  margin-bottom: 6px;
+  border: 1.5px solid var(--light-grey);
+  font-size: 0.92rem;
+}
+.task-row.done { opacity: 0.65; text-decoration: line-through; }
 </style>
 </head>
 <body>
@@ -410,7 +463,12 @@ details summary:hover { color: var(--dark); }
             </div>
             <div>
               <label>Class / Grade <span id="gradeRequired" style="color:var(--red);display:none;">*</span></label>
-              <input type="text" id="childGrade" placeholder="e.g. Class 3" value="{{ student.grade if student else '' }}"/>
+              <select id="childGrade">
+                <option value="">— Select class —</option>
+                {% for g in grade_options %}
+                <option value="{{ g }}" {% if student and student.grade == g %}selected{% endif %}>{{ g }}</option>
+                {% endfor %}
+              </select>
             </div>
           </div>
           <div style="margin-bottom:14px;">
@@ -429,6 +487,21 @@ details summary:hover { color: var(--dark); }
           🎉 Lesson is live! Speak naturally. Click Stop when you are finished.
         </div>
         <button class="btn btn-danger btn-full" onclick="stopSession()">⏹️ Stop lesson</button>
+      </div>
+    </div>
+
+    <!-- Mini teaching screen (syllabus visuals) -->
+    <div class="card" id="teachingScreenCard">
+      <div class="card-title">📺 Class screen (for child)</div>
+      <div class="teaching-screen" id="teachingScreen">
+        <div class="screen-label">SHIKSHA shows pictures here during lessons</div>
+        {% if teaching_image %}
+        <img id="teachingImg" src="{{ teaching_image }}" alt="Lesson visual" onerror="this.style.display='none'"/>
+        <p id="teachingCaption" style="margin-top:8px;font-weight:600;">{{ teaching_caption }}</p>
+        {% else %}
+        <div id="teachingPlaceholder" style="font-size:2.5rem;opacity:0.4;">📚 ✏️ 🔢</div>
+        <p id="teachingCaption" style="margin-top:8px;color:var(--grey);">Start a lesson — syllabus images appear when available.</p>
+        {% endif %}
       </div>
     </div>
 
@@ -589,6 +662,36 @@ details summary:hover { color: var(--dark); }
         {% endif %}
       </div>
 
+      <!-- Progress overview -->
+      <div class="card" id="progressChartCard">
+        <div class="card-title">📊 Learning progress</div>
+        <div class="chart-grid" id="progressChart">
+          {% if progress_chart %}
+          <div class="chart-stat"><div class="num">{{ progress_chart.syllabus_done }}</div><div class="lbl">Topics done</div></div>
+          <div class="chart-stat"><div class="num">{{ progress_chart.syllabus_in_progress }}</div><div class="lbl">In progress</div></div>
+          <div class="chart-stat"><div class="num">{{ progress_chart.live_sessions }}</div><div class="lbl">Live classes</div></div>
+          <div class="chart-stat"><div class="num">{{ progress_chart.homework_checks }}</div><div class="lbl">Homework checks</div></div>
+          {% else %}
+          <p style="color:var(--grey);grid-column:1/-1;">Load a student to see progress.</p>
+          {% endif %}
+        </div>
+        <details style="margin-top:14px;" id="syllabusTopicsDetails">
+          <summary>Syllabus topics (mark progress)</summary>
+          <div id="syllabusTopicsList" style="margin-top:10px;"></div>
+        </details>
+      </div>
+
+      <!-- Parent task board -->
+      <div class="card">
+        <div class="card-title">✅ Parent task board</div>
+        <p style="font-size:0.88rem;color:var(--grey);margin-bottom:10px;">Tasks you assign at home — track completion here.</p>
+        <div class="grid-3-1" style="margin-bottom:10px;">
+          <input type="text" id="parentTaskInput" placeholder="e.g. Practice tables 2× daily"/>
+          <button class="btn" onclick="addParentTask()">➕ Add</button>
+        </div>
+        <div id="parentTasksList"></div>
+      </div>
+
       <div class="grid-2" style="align-items:start;">
 
         <!-- Chat -->
@@ -735,6 +838,7 @@ async function startSession(){
     setAlert('startAlert',`🎉 Session started! Student ID: <strong>${res.student_id}</strong> — save this!`,'success');
     document.getElementById('sessionForm').style.display='none';
     document.getElementById('sessionRunning').style.display='block';
+    updateTeachingScreen(res.teaching_image, res.teaching_caption);
     startPolling();
   } else {
     setAlert('startAlert', res.error||'Failed to start.','error');
@@ -757,8 +861,37 @@ async function pollStatus(){
   try {
     const snap=await (await fetch('/session/status')).json();
     updateStatus(snap.status, snap.model, snap.messages, snap.interruptions, snap.error);
+    if(snap.status==='running'||snap.status==='starting'){
+      const t=await (await fetch('/teaching/current')).json();
+      if(t.ok) updateTeachingScreen(t.url, t.caption);
+    }
     if(snap.status==='stopped'||snap.status==='idle'||snap.status==='error') stopPolling();
   } catch(e){}
+}
+
+function updateTeachingScreen(url, caption){
+  const screen=document.getElementById('teachingScreen');
+  if(!screen) return;
+  let img=document.getElementById('teachingImg');
+  const capEl=document.getElementById('teachingCaption');
+  const ph=document.getElementById('teachingPlaceholder');
+  if(url){
+    if(ph) ph.style.display='none';
+    if(!img){
+      img=document.createElement('img');
+      img.id='teachingImg';
+      img.alt='Lesson visual';
+      img.onerror=function(){ this.style.display='none'; };
+      screen.appendChild(img);
+    }
+    img.src=url;
+    img.style.display='block';
+    if(capEl) capEl.textContent=caption||'';
+  } else {
+    if(img) img.style.display='none';
+    if(ph) ph.style.display='block';
+    if(capEl) capEl.textContent=caption||'Start a lesson — syllabus images appear when available.';
+  }
 }
 
 function updateStatus(status, model='', messages=null, interruptions=0, error=''){
@@ -888,7 +1021,6 @@ async function loadStudent(sid){
   const res=await post('/parent/load-student',{student_id:sid});
   if(!res.ok){ alert(res.error); return; }
   const s=res.student;
-  // Update profile card
   document.getElementById('profileSection').style.display='block';
   document.getElementById('profileCard').innerHTML=`
     <h3>🎒 ${escHtml(s.child_name)}'s Learning Profile</h3>
@@ -900,10 +1032,92 @@ async function loadStudent(sid){
     </div>
     ${s.notes?`<p style="margin-top:12px;">📝 <strong>Notes:</strong> ${escHtml(s.notes)}</p>`:''}
   `;
-  document.getElementById('parentChatBox').innerHTML=
-    '<div class="chat-empty">Ask SHIKSHA about '+escHtml(s.child_name)+'…</div>';
+  renderParentChat(res.parent_chat||[]);
+  if(res.chart) renderProgressChart(res.chart);
+  renderParentTasks(res.tasks||[]);
+  updateTeachingScreen(res.teaching_image, res.teaching_caption);
+  loadSyllabusTopics();
   document.getElementById('reportOutput').style.display='none';
   document.getElementById('searchResults').innerHTML='';
+}
+
+function renderParentChat(msgs){
+  const box=document.getElementById('parentChatBox');
+  if(!msgs.length){
+    box.innerHTML='<div class="chat-empty">Ask SHIKSHA about your child…</div>';
+    return;
+  }
+  box.innerHTML=msgs.map(m=>{
+    const isParent=m.role==='parent';
+    const cls=isParent?'user':'assistant';
+    const icon=isParent?'👨‍👩‍👧':'📚';
+    return `<div class="msg ${cls}"><div class="msg-avatar">${icon}</div><div class="msg-bubble">${escHtml(m.text)}</div></div>`;
+  }).join('');
+  box.scrollTop=box.scrollHeight;
+}
+
+function renderProgressChart(c){
+  const el=document.getElementById('progressChart');
+  if(!el) return;
+  el.innerHTML=`
+    <div class="chart-stat"><div class="num">${c.syllabus_done||0}</div><div class="lbl">Topics done</div></div>
+    <div class="chart-stat"><div class="num">${c.syllabus_in_progress||0}</div><div class="lbl">In progress</div></div>
+    <div class="chart-stat"><div class="num">${c.live_sessions||0}</div><div class="lbl">Live classes</div></div>
+    <div class="chart-stat"><div class="num">${c.homework_checks||0}</div><div class="lbl">Homework checks</div></div>`;
+}
+
+function renderParentTasks(tasks){
+  const el=document.getElementById('parentTasksList');
+  if(!el) return;
+  if(!tasks.length){ el.innerHTML='<p style="color:var(--grey);font-size:0.9rem;">No tasks yet.</p>'; return; }
+  el.innerHTML=tasks.map(t=>`
+    <div class="task-row ${t.status==='done'?'done':''}">
+      <span>${escHtml(t.task_text)}${t.subject?' · '+escHtml(t.subject):''}</span>
+      <button class="btn select-btn" onclick="toggleParentTask(${t.id},'${t.status==='done'?'open':'done'}')">${t.status==='done'?'↩️':'✅'}</button>
+    </div>`).join('');
+}
+
+async function addParentTask(){
+  const text=document.getElementById('parentTaskInput').value.trim();
+  if(!text) return;
+  const res=await post('/parent/tasks/add',{task_text:text});
+  if(res.ok){
+    document.getElementById('parentTaskInput').value='';
+    const list=await (await fetch('/parent/tasks')).json();
+    if(list.ok) renderParentTasks(list.tasks);
+  } else alert(res.error||'Failed');
+}
+
+async function toggleParentTask(id, status){
+  const res=await post('/parent/tasks/update',{task_id:id, status});
+  if(res.ok) renderParentTasks(res.tasks||[]);
+}
+
+async function loadSyllabusTopics(){
+  const el=document.getElementById('syllabusTopicsList');
+  if(!el) return;
+  const res=await (await fetch('/syllabus/topics')).json();
+  if(!res.ok||!res.topics.length){
+    el.innerHTML='<p style="color:var(--grey);">No syllabus for this class yet.</p>';
+    return;
+  }
+  el.innerHTML=res.topics.map(t=>`
+    <div class="task-row" style="text-decoration:none;">
+      <span><strong>${escHtml(t.title)}</strong> <small>(${escHtml(t.status)})</small></span>
+      <span>
+        <button class="btn select-btn" onclick="setTopicProgress('${t.id}','in_progress')">▶️</button>
+        <button class="btn select-btn" onclick="setTopicProgress('${t.id}','done')">✅</button>
+      </span>
+    </div>`).join('');
+}
+
+async function setTopicProgress(topicId, status){
+  const res=await post('/syllabus/topic-progress',{topic_id:topicId, status});
+  if(res.ok){
+    if(res.chart) renderProgressChart(res.chart);
+    updateTeachingScreen(res.url, res.caption);
+    loadSyllabusTopics();
+  }
 }
 
 async function sendParentMsg(){
@@ -912,7 +1126,11 @@ async function sendParentMsg(){
   document.getElementById('parentMsg').value='';
   appendParentMsg('user',msg);
   const res=await post('/parent/chat',{message:msg});
-  appendParentMsg('assistant', res.ok? res.reply : (res.error||'Error'));
+  if(res.ok && res.parent_chat){
+    renderParentChat(res.parent_chat);
+  } else {
+    appendParentMsg('assistant', res.ok? res.reply : (res.error||'Error'));
+  }
 }
 
 function appendParentMsg(role, text){
@@ -983,13 +1201,16 @@ async function generateReport(){
 
 // ── Init ───────────────────────────────────────────────────
 (function init(){
-  // If session already running on load, start polling
   const statusLabel=document.getElementById('statusLabel');
   if(statusLabel && (statusLabel.textContent.trim()==='running'||statusLabel.textContent.trim()==='starting')){
     startPolling();
   }
-  // Sync board display
   updateBoardDisplay();
+  {% if student %}
+  loadSyllabusTopics();
+  renderParentTasks([]);
+  fetch('/parent/tasks').then(r=>r.json()).then(d=>{ if(d.ok) renderParentTasks(d.tasks); });
+  {% endif %}
 })();
 </script>
 </body>

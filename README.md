@@ -7,24 +7,27 @@ SHIKSHA (Shiksha Di) is a voice-first AI tutor for children aged 4–12. It runs
 ## Features
 
 - **Live voice class** — Real-time teaching via microphone and speaker (Gemini Live API)
+- **Class syllabus** — Per-grade topic plans (JSON) injected into lessons; mini on-screen visuals when images are added
 - **Warm tutor persona** — Hinglish-friendly, encouraging, stories, poems, English speaking, good habits
 - **Homework board** — Assign tasks, generate sheets, export **PDF** or **Word**
 - **Homework checking** — Upload photos/PDF/DOCX or paste answers for AI feedback
-- **Voice homework sync** — Homework given in class appears on the Homework tab
-- **Student IDs** — Each child gets an ID like `SHK-XXXXXX` for returning sessions
-- **Parent corner** — Search by name or ID, chat with SHIKSHA, download report cards
+- **Student IDs** — Each child gets an ID like `S1`, `S2` for returning sessions
+- **Parent corner** — Search by name or ID, **persistent parent chat**, task board, progress stats, report cards (PDF)
 
 ## Project structure
 
 | File | Description |
 |------|-------------|
-| `app.py` | Streamlit web UI (tabs: Live class, Homework, Parent corner) |
+| `fastapi_app.py` | Web UI (FastAPI + Jinja templates) |
 | `main.py` | Live voice session, audio I/O, system prompt |
 | `homework.py` | Homework generation, checking, PDF/DOCX export |
-| `progress.py` | Student registry, activity logs, parent reports, chat history |
-| `requirements.txt` | Python dependencies |
+| `progress.py` | SQLite students, sessions, parent chat, syllabus progress |
+| `syllabus.py` | Class syllabus packs under `data/syllabus/` |
+| `session_store.py` | Per-browser cookie sessions (multi-tab safe) |
+| `templates/index.html` | Main UI |
+| `docs/SHIKSHA_PRODUCT_PLAN.md` | Product roadmap |
 
-Local data (not in git): `data/` — students, activities, homework, chats.
+Local data (not in git): `data/` — SQLite DB, syllabus JSON, teaching images.
 
 ## Requirements
 
@@ -54,37 +57,39 @@ Optional: adjust live model name if your account supports a different Live previ
 ## Run
 
 ```powershell
-streamlit run app.py
+uvicorn fastapi_app:app --reload
 ```
 
-Open the URL shown in the terminal (usually `http://localhost:8501`).
+Open **http://127.0.0.1:8000**
 
 ## How to use
 
 ### Child / student
 
-1. Click **Start lesson** → enter name (and optional age, class) or search an existing **Student ID**.
-2. Speak with SHIKSHA; she greets first to help kids feel comfortable.
-3. Use **Homework & tasks** for boards, downloads, and submitting work (search the same student ID).
+1. **Live class** → enter name (lookup fills details) or register with age, class, parent name.
+2. Pick **class** from the dropdown (Jr KG … Class 6).
+3. Speak with SHIKSHA; use the **class screen** for syllabus pictures when you add PNGs under `data/syllabus/`.
+4. **Homework & tasks** — board, generate sheet, download PDF/Word, submit work for checking.
 
 ### Parent
 
-1. Open **Parent corner**.
-2. **Search by** Student ID or name → **Search**.
-3. View progress, chat with SHIKSHA, or **Generate report card** (PDF download).
+1. **Parent corner** → search by Student ID or name.
+2. View **progress stats**, mark **syllabus topics**, manage **parent task board**.
+3. Chat with SHIKSHA (history is saved per student).
+4. **Generate report card** → download PDF.
 
 ## Environment variables
 
 | Variable | Purpose |
 |----------|---------|
 | `GEMINI_API_KEY` or `GOOGLE_API_KEY` | Required for all AI features |
-| `GEMINI_MODEL` | Live voice model (must support Live API) |
-| `GEMINI_TEXT_MODEL` | Text tasks: homework, reports, parent chat |
+| `GEMINI_MODEL` | Live voice model |
+| `GEMINI_TEXT_MODEL` | Homework, checks, parent chat, reports |
+
+## Syllabus packs
+
+Add `data/syllabus/class_1.json` (see `jr_kg.json`, `class_1.json` samples). Place images at paths referenced in `pages[].file` (e.g. `data/syllabus/class_1/en_a_apple.png`).
 
 ## License
 
-Private / educational use — add a license file if you open-source this project.
-
-## Author
-
-[pawarkiran3991](https://github.com/pawarkiran3991)
+MIT — see `LICENSE`.

@@ -117,7 +117,49 @@ def _init_db() -> None:
             checked_at         TEXT,
             FOREIGN KEY (student_id) REFERENCES students(student_id)
         );
+
+        CREATE TABLE IF NOT EXISTS parent_messages (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id  TEXT NOT NULL,
+            role        TEXT NOT NULL,
+            text        TEXT NOT NULL,
+            created_at  TEXT,
+            FOREIGN KEY (student_id) REFERENCES students(student_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS syllabus_progress (
+            student_id  TEXT NOT NULL,
+            topic_id    TEXT NOT NULL,
+            status      TEXT DEFAULT 'pending',
+            updated_at  TEXT,
+            PRIMARY KEY (student_id, topic_id),
+            FOREIGN KEY (student_id) REFERENCES students(student_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS parent_tasks (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id  TEXT NOT NULL,
+            task_text   TEXT NOT NULL,
+            subject     TEXT DEFAULT '',
+            status      TEXT DEFAULT 'open',
+            created_at  TEXT,
+            FOREIGN KEY (student_id) REFERENCES students(student_id)
+        );
         """)
+    _migrate_schema_v2()
+
+
+def _migrate_schema_v2() -> None:
+    """Add columns/tables for older DB files."""
+    db = _conn()
+    cols = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
+    if "parent_summary" not in cols:
+        db.execute("ALTER TABLE students ADD COLUMN parent_summary TEXT DEFAULT ''")
+    if "current_topic_id" not in cols:
+        db.execute("ALTER TABLE students ADD COLUMN current_topic_id TEXT DEFAULT ''")
+    if "weak_subjects" not in cols:
+        db.execute("ALTER TABLE students ADD COLUMN weak_subjects TEXT DEFAULT ''")
+    db.commit()
 
 
 _init_db()
@@ -326,6 +368,12 @@ def upsert_student(
             )
             student_id = new_sid
 
+    if grade.strip():
+        try:
+            init_syllabus_progress_for_grade(student_id, grade.strip())
+        except Exception:
+            pass
+
     _write_json_snapshot()
     return get_student(student_id)
 
@@ -505,7 +553,205 @@ def build_student_session_context(student: dict[str, Any]) -> str:
                 "",
             ]
 
+    # Syllabus context (class + progress)
+    grade = student.get("grade") or ""
+    if grade:
+        try:
+            from syllabus import build_syllabus_context_for_prompt
+
+            progress_map = get_syllabus_progress_map(sid)
+            current_topic = student.get("current_topic_id") or ""
+            lines += [
+                "",
+                build_syllabus_context_for_prompt(
+                    grade, progress_map, current_topic or None
+                ),
+            ]
+        except Exception:
+            pass
+
     return "\n".join(lines)
+
+
+# ── Parent chat persistence ───────────────────────────────────────────────────
+def save_parent_message(student_id: str, role: str, text: str) -> None:
+    if not student_id or not text.strip():
+        return
+    with _conn() as db:
+        db.execute(
+            """INSERT INTO parent_messages (student_id, role, text, created_at)
+               VALUES (?,?,?,?)""",
+            (student_id, role, text.strip(), _now_iso()),
+        )
+    refresh_parent_summary(student_id)
+
+
+def load_parent_messages(student_id: str, limit: int = 50) -> list[dict[str, str]]:
+    if not student_id:
+        return []
+    with _conn() as db:
+        rows = db.execute(
+            """SELECT role, text FROM parent_messages
+               WHERE student_id=? ORDER BY id ASC LIMIT ?""",
+            (student_id, limit),
+        ).fetchall()
+    return [{"role": r["role"], "text": r["text"]} for r in rows]
+
+
+def clear_parent_messages(student_id: str) -> None:
+    if not student_id:
+        return
+    with _conn() as db:
+        db.execute("DELETE FROM parent_messages WHERE student_id=?", (student_id,))
+        db.execute(
+            "UPDATE students SET parent_summary='' WHERE student_id=?",
+            (student_id,),
+        )
+
+
+def refresh_parent_summary(student_id: str) -> None:
+    """Rule-based rolling memory for natural parent greetings (no extra API call)."""
+    student = get_student(student_id)
+    if not student:
+        return
+    msgs = load_parent_messages(student_id, limit=20)
+    parent_lines = [m["text"] for m in msgs if m["role"] == "parent"][-3:]
+    assistant_lines = [m["text"] for m in msgs if m["role"] == "assistant"][-3:]
+    parts = [
+        f"Child: {student.get('child_name')}. Class: {student.get('grade') or 'not set'}.",
+    ]
+    if parent_lines:
+        parts.append("Last parent topics: " + " | ".join(parent_lines)[:400])
+    if assistant_lines:
+        parts.append("Last SHIKSHA advice: " + " | ".join(assistant_lines)[:400])
+    if student.get("weak_subjects"):
+        parts.append(f"Focus areas noted: {student['weak_subjects']}")
+    summary = "\n".join(parts)
+    with _conn() as db:
+        db.execute(
+            "UPDATE students SET parent_summary=?, updated_at=? WHERE student_id=?",
+            (summary[:2000], _now_iso(), student_id),
+        )
+
+
+def get_parent_opening_hint(student_id: str) -> str:
+    """Short hint for parent chat greeting style."""
+    student = get_student(student_id)
+    if not student:
+        return ""
+    summary = (student.get("parent_summary") or "").strip()
+    if summary:
+        return summary
+    return f"First conversation with parent of {student.get('child_name')}."
+
+
+# ── Syllabus progress ─────────────────────────────────────────────────────────
+def get_syllabus_progress_map(student_id: str) -> dict[str, str]:
+    if not student_id:
+        return {}
+    with _conn() as db:
+        rows = db.execute(
+            "SELECT topic_id, status FROM syllabus_progress WHERE student_id=?",
+            (student_id,),
+        ).fetchall()
+    return {r["topic_id"]: r["status"] for r in rows}
+
+
+def set_topic_progress(student_id: str, topic_id: str, status: str) -> None:
+    if not student_id or not topic_id:
+        return
+    status = status if status in ("pending", "in_progress", "done") else "pending"
+    with _conn() as db:
+        db.execute(
+            """INSERT INTO syllabus_progress (student_id, topic_id, status, updated_at)
+               VALUES (?,?,?,?)
+               ON CONFLICT(student_id, topic_id) DO UPDATE SET
+                 status=excluded.status, updated_at=excluded.updated_at""",
+            (student_id, topic_id, status, _now_iso()),
+        )
+        if status == "in_progress":
+            db.execute(
+                "UPDATE students SET current_topic_id=?, updated_at=? WHERE student_id=?",
+                (topic_id, _now_iso(), student_id),
+            )
+
+
+def init_syllabus_progress_for_grade(student_id: str, grade: str) -> None:
+    """Ensure all topics from class syllabus exist as pending."""
+    from syllabus import load_syllabus
+
+    existing = set(get_syllabus_progress_map(student_id).keys())
+    with _conn() as db:
+        for t in load_syllabus(grade).get("topics", []):
+            tid = t.get("id")
+            if not tid or tid in existing:
+                continue
+            db.execute(
+                """INSERT OR IGNORE INTO syllabus_progress
+                   (student_id, topic_id, status, updated_at)
+                   VALUES (?,?,?,?)""",
+                (student_id, tid, "pending", _now_iso()),
+            )
+
+
+def get_progress_chart_data(student_id: str) -> dict[str, Any]:
+    """Simple stats for parent UI chart."""
+    grade = (get_student(student_id) or {}).get("grade", "")
+    progress_map = get_syllabus_progress_map(student_id)
+    done = sum(1 for s in progress_map.values() if s == "done")
+    in_prog = sum(1 for s in progress_map.values() if s == "in_progress")
+    pending = sum(1 for s in progress_map.values() if s == "pending")
+    with _conn() as db:
+        sessions_n = db.execute(
+            "SELECT COUNT(*) AS c FROM sessions WHERE student_id=?", (student_id,)
+        ).fetchone()["c"]
+        checks_n = db.execute(
+            "SELECT COUNT(*) AS c FROM homework_checks WHERE student_id=?", (student_id,)
+        ).fetchone()["c"]
+    return {
+        "grade": grade,
+        "syllabus_done": done,
+        "syllabus_in_progress": in_prog,
+        "syllabus_pending": pending,
+        "live_sessions": sessions_n,
+        "homework_checks": checks_n,
+    }
+
+
+# ── Parent tasks ──────────────────────────────────────────────────────────────
+def add_parent_task(student_id: str, task_text: str, subject: str = "") -> dict[str, Any]:
+    if not student_id or not task_text.strip():
+        raise ValueError("Task text required.")
+    with _conn() as db:
+        cur = db.execute(
+            """INSERT INTO parent_tasks (student_id, task_text, subject, status, created_at)
+               VALUES (?,?,?,?,?)""",
+            (student_id, task_text.strip(), subject.strip(), "open", _now_iso()),
+        )
+        tid = cur.lastrowid
+    return {"id": tid, "task_text": task_text.strip(), "subject": subject, "status": "open"}
+
+
+def list_parent_tasks(student_id: str) -> list[dict[str, Any]]:
+    if not student_id:
+        return []
+    with _conn() as db:
+        rows = db.execute(
+            """SELECT id, task_text, subject, status, created_at FROM parent_tasks
+               WHERE student_id=? ORDER BY id DESC LIMIT 30""",
+            (student_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def update_parent_task_status(task_id: int, status: str) -> None:
+    if status not in ("open", "done"):
+        status = "open"
+    with _conn() as db:
+        db.execute(
+            "UPDATE parent_tasks SET status=? WHERE id=?",
+            (status, task_id),
+        )
 
 
 def build_progress_context(student_id: str) -> str:
@@ -531,6 +777,7 @@ def build_progress_context(student_id: str) -> str:
             (student_id,),
         ).fetchall()
 
+    parent_summary = (student.get("parent_summary") or "").strip()
     lines = [
         "## Student profile",
         f"Student ID : {student['student_id']}",
@@ -539,9 +786,12 @@ def build_progress_context(student_id: str) -> str:
         f"Grade      : {student.get('grade') or '(not set)'}",
         f"Parent     : {student.get('parent_name') or '(not set)'}",
         f"Notes      : {student.get('notes') or '(none)'}",
-        "",
-        f"## Session history ({len(sessions)} total sessions recorded)",
     ]
+    if parent_summary:
+        lines += ["", "## Memory from last parent conversations", parent_summary]
+    if student.get("weak_subjects"):
+        lines += ["", "## Subjects needing extra focus", student["weak_subjects"]]
+    lines += ["", f"## Session history ({len(sessions)} total sessions recorded)"]
     for s in sessions:
         lines.append(f"  [{s['session_date']}] {(s['summary'] or '')[:200]}")
 
@@ -557,6 +807,18 @@ def build_progress_context(student_id: str) -> str:
         for c in hw_checks:
             d = (c["checked_at"] or "")[:10]
             lines.append(f"  [{d}] {(c['feedback'] or '')[:200]}")
+
+    grade = student.get("grade") or ""
+    if grade:
+        try:
+            from syllabus import build_syllabus_context_for_prompt
+
+            lines += [
+                "",
+                build_syllabus_context_for_prompt(grade, get_syllabus_progress_map(student_id)),
+            ]
+        except Exception:
+            pass
 
     return "\n".join(lines)
 
@@ -696,14 +958,32 @@ def answer_parent_message(
     context = build_progress_context(student_id)
     child = student.get("child_name") or "your child"
     sid = student.get("student_id") or "unknown"
+    parent_memory = get_parent_opening_hint(student_id)
     history_text = "\n".join(
         f"{m['role'].upper()}: {m['text']}" for m in (chat_history or [])[-8:]
     )
+    is_greeting = any(
+        w in parent_message.lower()
+        for w in ("hello", "hi", "namaste", "shiksha", "how is", "kaise", "beti", "beta", "son", "daughter")
+    )
+    greeting_guide = ""
+    if is_greeting and parent_memory:
+        greeting_guide = (
+            f"\nStart with a warm greeting to the parent by name if known. "
+            f"Reference last conversation naturally: {parent_memory[:500]}\n"
+            f"Mention child's progress in subjects where you have data. "
+            f"Suggest what parents can focus on at home.\n"
+        )
+
     prompt = f"""You are {ASSISTANT_NAME}, speaking to a PARENT about their child.
 
 Child: {child} | Student ID: {sid}
 
 {context}
+
+Parent relationship memory:
+{parent_memory or "(first parent chat — introduce yourself warmly)"}
+{greeting_guide}
 
 Recent chat:
 {history_text or "(none)"}
@@ -711,14 +991,18 @@ Recent chat:
 Parent says:
 {parent_message}
 
-Reply warmly and professionally. Use only data from above.
-Always mention the Student ID ({sid}) so parents can save it for later."""
+Reply warmly and professionally in clear English (Hinglish OK for warmth).
+Use only evidence from the data above — do not invent test scores.
+If parent asks about progress, mention strengths, weak areas, homework, and syllabus topics covered vs pending.
+Always mention Student ID ({sid}) once if helpful."""
 
     try:
         r = _client().models.generate_content(model=_text_model(), contents=prompt)
         result = (r.text or "").strip()
         if not result:
             raise ValueError("AI returned empty response. Please try again.")
+        save_parent_message(student_id, "parent", parent_message)
+        save_parent_message(student_id, "assistant", result)
         return result
     except Exception as exc:
         if _is_quota_err(exc):
