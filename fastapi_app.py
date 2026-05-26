@@ -138,6 +138,22 @@ def _apply_lesson_context() -> None:
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
+@app.get("/student/lookup")
+async def student_lookup(q: str = ""):
+    """Quick lookup by student ID or name — used by main page auto-fill."""
+    if not q.strip():
+        return JSONResponse({"found": False})
+    # Try exact ID first
+    s = get_student(q.strip().upper())
+    if not s:
+        # Try by name
+        matches = search_students(q.strip())
+        if matches:
+            s = matches[0]
+    if s:
+        return JSONResponse({"found": True, "student": s})
+    return JSONResponse({"found": False})
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     snap = _snap()
@@ -220,10 +236,15 @@ async def session_status():
 
 @app.post("/homework/save-board")
 async def homework_save_board(board: str = Form(""), grade_hint: str = Form("")):
-    _SESSION["homework_board"] = board
+    today = date.today().isoformat()
+    board_with_date = board
+    # Add today's date at the top if not already present
+    if board.strip() and today not in board:
+        board_with_date = f"[Date: {today}]\n{board.strip()}"
+    _SESSION["homework_board"] = board_with_date
     _SESSION["grade_hint"] = grade_hint
     _apply_lesson_context()
-    return JSONResponse({"ok": True})
+    return JSONResponse({"ok": True, "board": board_with_date})
 
 
 @app.post("/homework/generate")
@@ -274,9 +295,16 @@ async def homework_add_topic(topic: str = Form(""), grade_hint: str = Form("")):
     if not topic.strip():
         return JSONResponse({"ok": False, "error": "Enter a topic first."})
     grade_str = grade_hint or _SESSION.get("grade_hint") or ""
+    today = date.today().isoformat()
     line = f"- {topic.strip()}{(' (Grade: ' + grade_str + ')') if grade_str else ''}"
     board = _SESSION["homework_board"]
-    _SESSION["homework_board"] = (board + "\n" + line).strip() if board.strip() else line
+    if not board.strip():
+        _SESSION["homework_board"] = f"[Date: {today}]\n{line}"
+    else:
+        if today not in board:
+            _SESSION["homework_board"] = f"[Date: {today}]\n{board.strip()}\n{line}"
+        else:
+            _SESSION["homework_board"] = board.strip() + "\n" + line
     _apply_lesson_context()
     return JSONResponse({"ok": True, "board": _SESSION["homework_board"]})
 
@@ -369,16 +397,21 @@ async def parent_chat(message: str = Form(...)):
     sid = _SESSION["active_student_id"]
     student = get_student(sid) if sid else None
     if not student:
-        return JSONResponse({"ok": False, "error": "Load a student first."})
+        return JSONResponse({"ok": False, "error": "Pehle student load karo (Parent Corner me search karo)."})
+    if not message.strip():
+        return JSONResponse({"ok": False, "error": "Message khali hai."})
     _SESSION["parent_chat"].append({"role": "parent", "text": message})
     try:
         reply = answer_parent_message(sid, message, _SESSION["parent_chat"][:-1])
+        if not reply:
+            raise ValueError("Empty response from AI.")
         _SESSION["parent_chat"].append({"role": "assistant", "text": reply})
         return JSONResponse({"ok": True, "reply": reply})
     except Exception as exc:
-        err = f"Sorry, I could not respond: {exc}"
-        _SESSION["parent_chat"].append({"role": "assistant", "text": err})
-        return JSONResponse({"ok": False, "error": err})
+        err_msg = str(exc)
+        # Don't add error to chat history as assistant message
+        _SESSION["parent_chat"].pop()  # remove the parent message we added
+        return JSONResponse({"ok": False, "error": f"Error: {err_msg}"})
 
 
 @app.post("/parent/clear-chat")

@@ -604,12 +604,18 @@ def _write_json_snapshot() -> None:
 
 
 # ── AI helpers ────────────────────────────────────────────────────────────────
+# Models that are deprecated / no longer available via generateContent
+_DEPRECATED_MODELS = {"gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro", "gemini-pro"}
+
+
 def _text_model() -> str:
+    # Prefer explicit text model env var
     m = os.getenv("GEMINI_TEXT_MODEL", "").strip()
-    if m:
+    if m and m not in _DEPRECATED_MODELS:
         return m
+    # Fall back to GEMINI_MODEL if it's a non-live, non-deprecated model
     m2 = os.getenv("GEMINI_MODEL", "").strip()
-    if m2 and "live" not in m2.lower():
+    if m2 and "live" not in m2.lower() and m2 not in _DEPRECATED_MODELS:
         return m2
     return DEFAULT_TEXT_MODEL
 
@@ -682,10 +688,14 @@ def answer_parent_message(
     parent_message: str,
     chat_history: list[dict[str, str]] | None = None,
 ) -> str:
-    student = get_student(student_id) if student_id else None
-    context = build_progress_context(student_id) if student_id else "No student loaded."
-    child = (student or {}).get("child_name") or "your child"
-    sid = (student or {}).get("student_id") or "unknown"
+    if not student_id:
+        raise ValueError("No student selected. Please load a student first from Parent Corner.")
+    student = get_student(student_id)
+    if not student:
+        raise ValueError(f"Student '{student_id}' not found in database.")
+    context = build_progress_context(student_id)
+    child = student.get("child_name") or "your child"
+    sid = student.get("student_id") or "unknown"
     history_text = "\n".join(
         f"{m['role'].upper()}: {m['text']}" for m in (chat_history or [])[-8:]
     )
@@ -706,10 +716,13 @@ Always mention the Student ID ({sid}) so parents can save it for later."""
 
     try:
         r = _client().models.generate_content(model=_text_model(), contents=prompt)
-        return (r.text or "").strip()
+        result = (r.text or "").strip()
+        if not result:
+            raise ValueError("AI returned empty response. Please try again.")
+        return result
     except Exception as exc:
         if _is_quota_err(exc):
-            return f"AI quota exhausted. Please try again later. Student ID: {sid}."
+            return f"AI quota exhausted. Please try again in a few minutes. Student ID: {sid}."
         raise RuntimeError(f"Parent chat failed: {exc}") from exc
 
 

@@ -15,17 +15,20 @@ load_env_file()
 
 DEFAULT_TEXT_MODEL = "gemini-2.0-flash"
 
+# Models that are deprecated / no longer available via generateContent
+_DEPRECATED_MODELS = {"gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro", "gemini-pro"}
+
 # Singleton client — reused across calls to avoid "client has been closed" errors
 _GENAI_CLIENT: genai.Client | None = None
 
 
 def get_text_model() -> str:
     text_model = os.getenv("GEMINI_TEXT_MODEL", "").strip()
-    if text_model:
+    if text_model and text_model not in _DEPRECATED_MODELS:
         return text_model
 
     configured_model = os.getenv("GEMINI_MODEL", "").strip()
-    if configured_model and "live" not in configured_model.lower():
+    if configured_model and "live" not in configured_model.lower() and configured_model not in _DEPRECATED_MODELS:
         return configured_model
 
     return DEFAULT_TEXT_MODEL

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /c/Users/kirpawar/Desktop/AI_PROJECTS/fwdai/templates)",
+      "Bash(mkdir -p /c/Users/kirpawar/Desktop/AI_PROJECTS/fwdai/static)",
+      "Bash(.venv/Scripts/python *)",
+      "Bash(.venv/Scripts/pip install *)",
+      "Bash(python -c \"import fastapi_app; print\\('fastapi_app OK'\\)\")",
+      "Bash(python -c \"import main; print\\('main OK'\\)\")",
+      "Bash(python *)"
+    ]
+  }
+}

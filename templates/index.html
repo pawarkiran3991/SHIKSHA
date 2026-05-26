@@ -378,31 +378,47 @@ details summary:hover { color: var(--dark); }
 
       <!-- Session form -->
       <div id="sessionForm" {% if status in ['running', 'starting'] %}style="display:none"{% endif %}>
-        <p style="color:var(--grey);margin-bottom:14px;">Fill in your details and start a live lesson with <strong>{{ assistant_name }}</strong>!</p>
+        <p style="color:var(--grey);margin-bottom:14px;">
+          Returning student? Enter your <strong>name or Student ID</strong> — details fill automatically!<br>
+          New student? Enter name + ID then fill all details.
+        </p>
+
+        <!-- Step 1: Name + ID lookup -->
         <div class="grid-2" style="margin-bottom:10px;">
           <div>
             <label>Child's name *</label>
-            <input type="text" id="childName" placeholder="e.g. Mitansh" value="{{ student.child_name if student else '' }}"/>
+            <input type="text" id="childName" placeholder="e.g. Mitansh" value="{{ student.child_name if student else '' }}"
+              oninput="clearAutoFill()" onblur="autoLookup()"/>
           </div>
           <div>
-            <label>Student ID (returning students)</label>
-            <input type="text" id="studentId" placeholder="e.g. S1, S2…" value="{{ student.student_id if student else '' }}"/>
+            <label>Student ID</label>
+            <input type="text" id="studentId" placeholder="e.g. S1, S2 (optional for new)"
+              value="{{ student.student_id if student else '' }}"
+              oninput="clearAutoFill()" onblur="autoLookup()"/>
           </div>
         </div>
-        <div class="grid-2" style="margin-bottom:10px;">
-          <div>
-            <label>Age</label>
-            <input type="text" id="childAge" placeholder="e.g. 8" value="{{ student.age if student else '' }}"/>
+
+        <!-- Auto-fill notice -->
+        <div id="lookupNotice" style="display:none;margin-bottom:10px;"></div>
+
+        <!-- Step 2: Extra details (shown always, required for new students) -->
+        <div id="extraFields">
+          <div class="grid-2" style="margin-bottom:10px;">
+            <div>
+              <label>Age <span id="ageRequired" style="color:var(--red);display:none;">*</span></label>
+              <input type="text" id="childAge" placeholder="e.g. 8" value="{{ student.age if student else '' }}"/>
+            </div>
+            <div>
+              <label>Class / Grade <span id="gradeRequired" style="color:var(--red);display:none;">*</span></label>
+              <input type="text" id="childGrade" placeholder="e.g. Class 3" value="{{ student.grade if student else '' }}"/>
+            </div>
           </div>
-          <div>
-            <label>Class / Grade</label>
-            <input type="text" id="childGrade" placeholder="e.g. Class 3" value="{{ student.grade if student else '' }}"/>
+          <div style="margin-bottom:14px;">
+            <label>Parent name <span id="parentRequired" style="color:var(--red);display:none;">*</span></label>
+            <input type="text" id="parentName" placeholder="e.g. Mrs. Sharma" value="{{ student.parent_name if student else '' }}"/>
           </div>
         </div>
-        <div style="margin-bottom:14px;">
-          <label>Parent name</label>
-          <input type="text" id="parentName" placeholder="e.g. Mrs. Sharma" value="{{ student.parent_name if student else '' }}"/>
-        </div>
+
         <div id="startAlert"></div>
         <button class="btn btn-primary btn-full" onclick="startSession()">🚀 Start my lesson!</button>
       </div>
@@ -638,17 +654,82 @@ async function post(url, data){
   return r.json();
 }
 
+// ── Student auto-lookup ────────────────────────────────────
+let _lookupTimer = null;
+let _isKnownStudent = false;
+
+function clearAutoFill(){
+  _isKnownStudent = false;
+  document.getElementById('lookupNotice').style.display='none';
+  setRequiredMarkers(true);
+}
+
+function setRequiredMarkers(show){
+  ['ageRequired','gradeRequired','parentRequired'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.style.display = show ? 'inline' : 'none';
+  });
+}
+
+async function autoLookup(){
+  const name = document.getElementById('childName').value.trim();
+  const sid  = document.getElementById('studentId').value.trim();
+  if(!name && !sid) return;
+
+  clearTimeout(_lookupTimer);
+  _lookupTimer = setTimeout(async ()=>{
+    const q = sid || name;
+    try {
+      const r = await fetch(`/student/lookup?q=${encodeURIComponent(q)}`);
+      const data = await r.json();
+      if(data.found){
+        const s = data.student;
+        _isKnownStudent = true;
+        // Auto-fill all fields
+        document.getElementById('childName').value  = s.child_name || '';
+        document.getElementById('studentId').value  = s.student_id || '';
+        document.getElementById('childAge').value   = s.age || '';
+        document.getElementById('childGrade').value = s.grade || '';
+        document.getElementById('parentName').value = s.parent_name || '';
+        // Show success notice
+        const notice = document.getElementById('lookupNotice');
+        notice.innerHTML = `<div class="alert alert-success">✅ Student found: <strong>${escHtml(s.child_name)}</strong> (ID: ${escHtml(s.student_id)}) — details filled automatically!</div>`;
+        notice.style.display='block';
+        setRequiredMarkers(false);
+      } else if(name || sid){
+        _isKnownStudent = false;
+        const notice = document.getElementById('lookupNotice');
+        notice.innerHTML = `<div class="alert alert-info">🆕 New student — please fill all details below.</div>`;
+        notice.style.display='block';
+        setRequiredMarkers(true);
+      }
+    } catch(e){}
+  }, 600);
+}
+
 // ── Session ────────────────────────────────────────────────
 async function startSession(){
   const name=document.getElementById('childName').value.trim();
+  const sid =document.getElementById('studentId').value.trim();
+  const age =document.getElementById('childAge').value.trim();
+  const grade=document.getElementById('childGrade').value.trim();
+  const parent=document.getElementById('parentName').value.trim();
+
   if(!name){ setAlert('startAlert','Please enter the child\'s name.','error'); return; }
+
+  // For new students (not found in DB), all fields are mandatory
+  if(!_isKnownStudent && (!age || !grade || !parent)){
+    setAlert('startAlert','New student hai — Age, Class, aur Parent name sab mandatory hain.','error');
+    return;
+  }
+
   setAlert('startAlert','<span class="spinner"></span> Starting…','info');
   const res=await post('/session/start',{
     child_name: name,
-    age: document.getElementById('childAge').value,
-    grade: document.getElementById('childGrade').value,
-    parent_name: document.getElementById('parentName').value,
-    student_id: document.getElementById('studentId').value,
+    age: age,
+    grade: grade,
+    parent_name: parent,
+    student_id: sid,
   });
   if(res.ok){
     setAlert('startAlert',`🎉 Session started! Student ID: <strong>${res.student_id}</strong> — save this!`,'success');
@@ -722,7 +803,11 @@ async function saveBoard(){
     board: document.getElementById('homeworkBoard').value,
     grade_hint: document.getElementById('gradeHint').value,
   });
-  setAlert('boardAlert','✅ Saved!','success');
+  if(res.ok && res.board){
+    // Update textarea with date-stamped version from server
+    document.getElementById('homeworkBoard').value = res.board;
+  }
+  setAlert('boardAlert','✅ Saved with today\'s date!','success');
   updateBoardDisplay();
   setTimeout(()=>clearAlert('boardAlert'),3000);
 }
