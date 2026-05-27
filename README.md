@@ -48,11 +48,13 @@ Create a `.env` file in the project root:
 
 ```env
 GEMINI_API_KEY=your_api_key_here
-GEMINI_MODEL=gemini-2.0-flash-live-preview
+GEMINI_MODEL=gemini-3.1-flash-live-preview
 GEMINI_TEXT_MODEL=gemini-2.0-flash
 ```
 
-Optional: adjust live model name if your account supports a different Live preview model.
+**Live voice model:** Use a **Live API** model ID (must contain `live`). `gemini-2.0-flash-live-preview` is not a valid Google model name — use `gemini-3.1-flash-live-preview`. SHIKSHA auto-maps old names if they remain in `.env`.
+
+Optional: adjust model names if your API key supports different Live preview models.
 
 ## Run
 

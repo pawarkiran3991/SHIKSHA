@@ -898,7 +898,19 @@ function updateStatus(status, model='', messages=null, interruptions=0, error=''
   const dot=document.getElementById('statusDot');
   const lbl=document.getElementById('statusLabel');
   if(dot){ dot.className='status-dot status-'+status; }
-  if(lbl){ lbl.textContent=status+(model?' · '+model:''); }
+  if(lbl){
+    lbl.textContent=status+(model?' · '+model:'');
+    if(status==='error' && error){
+      lbl.title=error;
+      lbl.textContent+=' — '+error.slice(0,120);
+    }
+  }
+  if(status==='error' && error){
+    setAlert('startAlert', `<strong>Live class failed:</strong> ${escHtml(error)}<br><small>Tip: set <code>GEMINI_MODEL=gemini-3.1-flash-live-preview</code> in .env and restart the server.</small>`, 'error');
+    document.getElementById('sessionRunning').style.display='none';
+    document.getElementById('sessionForm').style.display='block';
+    stopPolling();
+  }
 
   if(messages) renderMessages(messages);
   if(status==='stopped'||status==='idle'){

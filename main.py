@@ -44,6 +44,14 @@ load_env_file()
 
 ASSISTANT_NAME = "SHIKSHA"
 DEFAULT_MODEL = "gemini-3.1-flash-live-preview"
+
+# Short names from README/old .env → current Live API IDs (see ai.google.dev/gemini-api/docs/changelog)
+LIVE_MODEL_ALIASES: dict[str, str] = {
+    "gemini-2.0-flash-live-preview": "gemini-3.1-flash-live-preview",
+    "gemini-2.0-flash-live-001": "gemini-3.1-flash-live-preview",
+    "gemini-live-2.5-flash-preview": "gemini-3.1-flash-live-preview",
+    "gemini-2.5-flash-preview-native-audio-dialog": "gemini-3.1-flash-live-preview",
+}
 INPUT_SAMPLE_RATE = 16000
 OUTPUT_SAMPLE_RATE = 24000
 CHANNELS = 1
@@ -167,10 +175,12 @@ def build_system_instruction(
 
 
 def get_model_name() -> str:
-    configured_model = os.getenv("GEMINI_MODEL", "").strip()
-    if configured_model and "live" in configured_model.lower():
-        return configured_model
-    return DEFAULT_MODEL
+    configured_model = os.getenv("GEMINI_MODEL", "").strip().strip('"').strip("'")
+    if not configured_model:
+        return DEFAULT_MODEL
+    if "live" not in configured_model.lower():
+        return DEFAULT_MODEL
+    return LIVE_MODEL_ALIASES.get(configured_model, configured_model)
 
 
 def get_api_key() -> str:
